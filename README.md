@@ -125,6 +125,7 @@ Tips:
 | `jobapplier submit` | Submit approved applications now |
 | `jobapplier import-resume path\to\resume.docx` | Import a resume |
 | `jobapplier add-company Stripe https://jobs.lever.co/acme` | Watch companies |
+| `jobapplier check-sites [--browser]` | Read-only check that the live sites still parse |
 | `jobapplier linkedin-login` | Sign in to LinkedIn in the bot's browser |
 | `jobapplier set-secret anthropic_api_key` | Store a key in Credential Manager |
 | `jobapplier register-task --time 08:00` / `unregister-task` | Windows Task Scheduler |
@@ -140,6 +141,24 @@ Tips:
 - Required questions it can't answer from your profile or answer bank are never guessed. The
   application waits for you. Free-text questions get an AI draft for you to edit.
 - Nothing is submitted without your approval.
+
+## Checking the live sites
+
+Job sites change their pages without notice. To check that the app still reads them correctly:
+
+```powershell
+jobapplier check-sites            # job listings, application forms, LinkedIn search (read-only)
+jobapplier check-sites --browser  # also fill one real form per site in a hidden browser
+```
+
+Nothing is ever submitted. The browser check types an obviously fake test profile into one real
+form per site, skips file uploads (some sites upload a file as soon as it's picked), then closes the
+page without pressing submit. It uses a few well-known public boards; set e.g.
+`JOBAPPLIER_CHECK_BOARDS=greenhouse:stripe;lever:palantir;ashby:openai` to pick others.
+LinkedIn Easy Apply itself needs your login, so it's checked by a dry run from the dashboard instead.
+
+The same checks run as opt-in tests: `JOBAPPLIER_LIVE=1 pytest tests/test_live_sites.py`
+(add `JOBAPPLIER_LIVE_BROWSER=1` for the browser check).
 
 ## Development
 

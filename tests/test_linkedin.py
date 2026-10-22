@@ -205,3 +205,14 @@ def test_held_job_returns_to_queue_and_submits(profile, resume, files):
         assert row.status == JobStatus.SUBMITTED
         labels = {f["key"] for f in row.form_fields}
         assert YEARS_Q in labels and row.answers[YEARS_Q] == "6"
+
+
+def test_network_failure_does_not_crash_discovery():
+    import httpx
+
+    def down(request):
+        raise httpx.ConnectError("refused")
+
+    with db.session() as s:
+        added = discover_linkedin(s, _settings(), RunLog("test"), httpx.Client(transport=httpx.MockTransport(down)))
+    assert added == 0

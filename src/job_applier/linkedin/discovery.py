@@ -8,7 +8,7 @@ from sqlmodel import Session, func, select
 from job_applier.ats import parse_board_url
 from job_applier.ats.base import infer_workplace
 from job_applier.db import Company, Job, JobStatus
-from job_applier.linkedin.search import Card, LinkedInSearch, RateLimited
+from job_applier.linkedin.search import Card, LinkedInSearch, SearchError
 from job_applier.pipeline import filters
 from job_applier.settings import Settings
 
@@ -94,7 +94,7 @@ def discover_linkedin(
             s.commit()
             if job.status == JobStatus.NEW:
                 added += 1
-    except RateLimited as exc:
+    except SearchError as exc:  # rate limit or network trouble: keep what we have, skip the rest
         s.commit()
         log("! LinkedIn: %s", exc)
     log("LinkedIn: %d new jobs added", added)

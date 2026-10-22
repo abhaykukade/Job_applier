@@ -81,6 +81,16 @@ def cmd_add_company(args) -> None:
                     print(f"• {name}: already watching {ats} ({token})")
 
 
+def cmd_check_sites(args) -> None:
+    from job_applier import selftest
+
+    print("Checking live job sites (read-only; nothing is submitted)...\n")
+    results = selftest.run(browser=args.browser, linkedin=not args.no_linkedin)
+    print(selftest.report(results))
+    if any(not c.ok for c in results):
+        sys.exit(1)
+
+
 def cmd_linkedin_login(args) -> None:
     from job_applier.linkedin import session
 
@@ -133,6 +143,11 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("add-company", help="Watch companies (names or careers-board URLs)")
     p.add_argument("names", nargs="+")
     p.set_defaults(func=cmd_add_company)
+
+    p = sub.add_parser("check-sites", help="Read-only check that live job sites still parse correctly")
+    p.add_argument("--browser", action="store_true", help="Also fill (never submit) one real form per site")
+    p.add_argument("--no-linkedin", action="store_true")
+    p.set_defaults(func=cmd_check_sites)
 
     sub.add_parser("linkedin-login", help="Sign in to LinkedIn in the bot's browser").set_defaults(func=cmd_linkedin_login)
 

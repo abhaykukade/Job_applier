@@ -24,7 +24,11 @@ WORKPLACE_CODES = {"onsite": "1", "remote": "2", "hybrid": "3"}
 PAUSE = (1.5, 4.0)  # seconds between requests, to stay well under LinkedIn's limits
 
 
-class RateLimited(RuntimeError):
+class SearchError(RuntimeError):
+    pass
+
+
+class RateLimited(SearchError):
     pass
 
 
@@ -108,7 +112,10 @@ class LinkedInSearch:
 
     def _get(self, url: str, params: dict | None = None) -> str:
         time.sleep(random.uniform(*self.pause))
-        resp = self.http.get(url, params=params)
+        try:
+            resp = self.http.get(url, params=params)
+        except httpx.HTTPError as exc:
+            raise SearchError(f"Can't reach LinkedIn: {exc}") from exc
         if resp.status_code == 429:
             raise RateLimited("LinkedIn is rate limiting searches; try again later")
         if resp.status_code >= 400:
