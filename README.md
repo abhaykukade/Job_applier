@@ -2,7 +2,8 @@
 
 A local assistant that runs once a day on your Windows PC. It:
 
-1. **Finds jobs** on the Greenhouse, Lever and Ashby boards of companies you watch.
+1. **Finds jobs** on the Greenhouse, Lever and Ashby boards of companies you watch, and in LinkedIn
+   search results (searched through LinkedIn's public job pages, never your account).
 2. **Filters** them by your titles, seniority, keywords, locations and remote/hybrid/onsite preference.
 3. **Scores** each match with an AI model (Claude, OpenAI or a local Ollama model).
 4. **Prepares** each application: reads the real form, fills what it can from your profile,
@@ -14,7 +15,19 @@ A local assistant that runs once a day on your Windows PC. It:
 Everything personal (resume, profile, answers, database, screenshots) stays in `data/` on your PC
 and is git-ignored. API keys and passwords are kept in Windows Credential Manager.
 
-> LinkedIn Easy Apply and Workday/iCIMS/Taleo come in later milestones; see [PLAN.md](PLAN.md).
+LinkedIn results are routed by how each job is applied to:
+
+- **Easy Apply**: applied to in the bot's browser, logged in as you. This uses your account, so it
+  keeps to its own daily cap and pauses of 1 to 3 minutes between applications.
+- **Company site on Greenhouse, Lever or Ashby**: the company is added to your watch list and
+  handled like any other board.
+- **Any other company site** (Workday etc.): listed under *Apply on company site* with a link and
+  a tailored resume, for you to apply yourself.
+
+> Automating applications is against LinkedIn's User Agreement and can get an account restricted.
+> Keep the LinkedIn cap low. If LinkedIn shows a security check, the bot stops and leaves it to you.
+
+Workday/iCIMS/Taleo applications come in a later milestone; see [PLAN.md](PLAN.md).
 
 ## Install (Windows)
 
@@ -43,12 +56,16 @@ and is git-ignored. API keys and passwords are kept in Windows Credential Manage
      your EEO answers (entered once).
    - **Search & limits**: titles, locations, workplace types, minimum score and daily caps.
 
-4. **Companies**: add companies by name (auto-detects Greenhouse/Lever/Ashby) or paste a
+4. **LinkedIn** (optional, Setup → LinkedIn): tick *Search LinkedIn*, then click **Log in to
+   LinkedIn** and sign in yourself in the window that opens. 2FA is fine, and your password is never
+   stored: only the browser session is kept, in `data/browser-profile`.
+
+5. **Companies**: add companies by name (auto-detects Greenhouse/Lever/Ashby) or paste a
    careers-board URL such as `https://boards.greenhouse.io/acme` or `https://jobs.lever.co/acme`.
 
-5. Click **Search now** for a first run, then answer **Questions** and review the **Queue**.
+6. Click **Search now** for a first run, then answer **Questions** and review the **Queue**.
 
-6. Schedule the daily run (your PC needs to be on and you signed in at that time):
+7. Schedule the daily run (your PC needs to be on and you signed in at that time):
 
    ```powershell
    jobapplier register-task --time 08:00
@@ -63,6 +80,10 @@ and is git-ignored. API keys and passwords are kept in Windows Credential Manage
   - open each **Ready** job: accept or reject resume edits, check the answers and the cover
     letter, then **Approve**.
   - click **Submit approved**, or let tomorrow's run submit them.
+- LinkedIn only shows its Easy Apply questions inside the apply dialog, so they're read when
+  submitting. If it asks something the bot can't answer, the draft is discarded and the question
+  appears on the Questions page. Once you answer, the job goes back in the queue without needing
+  approval again. If a cover letter turns out to be required, a draft is written for you to review.
 - If a site shows a CAPTCHA or an email-verification step, the browser waits up to 5 minutes for you
   to finish it. Otherwise the job moves to **Needs you** with a screenshot.
 - When dry-run screenshots look right, untick **Dry run** in Setup.
@@ -76,6 +97,7 @@ and is git-ignored. API keys and passwords are kept in Windows Credential Manage
 | `jobapplier submit` | Submit approved applications now |
 | `jobapplier import-resume path\to\resume.docx` | Import a resume |
 | `jobapplier add-company Stripe https://jobs.lever.co/acme` | Watch companies |
+| `jobapplier linkedin-login` | Sign in to LinkedIn in the bot's browser |
 | `jobapplier set-secret anthropic_api_key` | Store a key in Credential Manager |
 | `jobapplier register-task --time 08:00` / `unregister-task` | Windows Task Scheduler |
 

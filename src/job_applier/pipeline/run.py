@@ -8,6 +8,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import httpx
 from sqlmodel import Session, select
@@ -16,9 +17,11 @@ from job_applier import db, paths
 from job_applier.ats import ATSError, get_ats
 from job_applier.db import Company, Job, JobStatus, Question, Run, Suggestion, SuggestionStatus, utcnow
 from job_applier.forms.mapping import Context, normalize, resolve_form
+from job_applier.forms.models import FormField
+from job_applier.linkedin.discovery import EASY_APPLY, EXTERNAL, discover_linkedin
 from job_applier.llm import LLM, LLMError, get_llm
 from job_applier.pipeline import ai, filters
-from job_applier.pipeline.answers import bank, claim_key, refresh_status
+from job_applier.pipeline.answers import bank, claim_key, is_yes, refresh_status
 from job_applier.profile import store
 from job_applier.profile.models import Profile, Resume
 from job_applier.resume.tailoring import to_proposed
@@ -86,8 +89,10 @@ class RunLog:
 
 # ---------- stages ----------
 
-def discover(s: Session, log_: RunLog, client: httpx.Client | None = None) -> int:
-    new = 0
+def discover(s: Session, log_: RunLog, client: httpx.Client | None = None, settings: Settings | None = None) -> int:
+    settings = settings or load_settings()
+    # LinkedIn first: it can add companies whose boards are then checked below.
+    new = discover_linkedin(s, settings, log_, client)
     for company in s.exec(select(Company).where(Company.active == True)):  # noqa: E712
         ats = get_ats(company.ats, client)
         try:
@@ -118,7 +123,11 @@ def discover(s: Session, log_: RunLog, client: httpx.Client | None = None) -> in
 def apply_filters(s: Session, settings: Settings, log_: RunLog) -> int:
     passed = 0
     for job in s.exec(select(Job).where(Job.status == JobStatus.NEW)):
-        reason = filters.check(job.title, job.description, job.location, job.workplace, job.posted_at, settings.search)
+        reason = filters.check(
+            job.title, job.description, job.location, job.workplace, job.posted_at, settings.search,
+            # LinkedIn already searched by your locations; its location text is often just a city.
+            check_location=job.ats not in (EASY_APPLY, EXTERNAL),
+        )
         if reason:
             job.status, job.status_reason = JobStatus.FILTERED_OUT, reason
             s.add(job)
@@ -162,42 +171,17 @@ def _add_question(s: Session, job: Job, **kwargs) -> None:
         s.add(Question(job_id=job.id, **kwargs))
 
 
-def prepare_job(
-    s: Session,
-    job: Job,
-    llm: LLM,
-    resume: Resume,
-    profile: Profile,
-    log_: RunLog,
-    client: httpx.Client | None = None,
+def ask_about(
+    s: Session, job: Job, unresolved: list[FormField], llm: LLM | None, resume: Resume, label_keys: bool = False
 ) -> None:
-    ats = get_ats(job.ats, client)
-    try:
-        fields = ats.get_form(job.company_token, job.external_id, job.apply_url)
-    except ATSError as exc:
-        job.status, job.status_reason = JobStatus.FAILED, f"Could not read the application form: {exc}"
-        s.add(job)
-        s.commit()
-        log_("! %s: %s", job.title, exc)
-        return
-    job.form_fields = [f.model_dump() for f in fields]
-    job.cover_letter_required = ats.needs_cover_letter(fields)
-    if job.cover_letter_required and not job.cover_letter:
-        try:
-            job.cover_letter = ai.cover_letter(llm, resume, job.title, job.company_name, job.description)
-        except LLMError as exc:
-            log_("! cover letter for %s failed: %s", job.title, exc)
+    """Hold questions we can't answer, with an AI draft where the resume supports one.
 
-    answers_bank = bank(s)
-    ctx = Context(profile, answers_bank, job.location, cover_letter_available=bool(job.cover_letter))
-    resolution = resolve_form(fields, ctx)
-    job.answers = resolution.answers
-    s.add(job)
-    s.flush()
-
-    for f in resolution.unresolved:
+    `label_keys` stores answers under the question text instead of the field id (LinkedIn's
+    field ids change on every page load).
+    """
+    for f in unresolved:
         draft, reusable = None, f.type != "textarea"
-        if f.type != "file":
+        if f.type != "file" and llm is not None:
             try:
                 d = ai.draft_answer(llm, resume, f.label, f.option_labels, job.title, job.company_name, job.description)
                 draft, reusable = d.answer, reusable and not d.job_specific
@@ -206,18 +190,21 @@ def prepare_job(
         prompt = f.label + (f"\n{f.description}" if f.description else "")
         if f.type == "file":
             prompt += "\n(File upload: answer with the full path to the file on this PC.)"
+        key = normalize(f.label) or f.key
         _add_question(
-            s, job, kind="form", key=normalize(f.label) or f.key, field_key=f.key, prompt=prompt,
+            s, job, kind="form", key=key, field_key=key if label_keys else f.key, prompt=prompt,
             field_type=f.type, options=f.option_labels or None, draft=draft, reusable=reusable,
         )
 
-    # Resume tailoring: suggestions you accept or reject; new claims need your confirmation.
+
+def suggest_edits(s: Session, job: Job, llm: LLM, resume: Resume, answers_bank: dict[str, str], log_) -> None:
+    """Resume tailoring: suggestions you accept or reject; new claims need your confirmation."""
     gaps = (job.match or {}).get("gaps", [])
     try:
         edits = ai.tailor(llm, resume, job.title, job.company_name, job.description, gaps).edits
     except LLMError as exc:
         log_("! tailoring %s failed: %s", job.title, exc)
-        edits = []
+        return
     for edit in edits:
         prop = to_proposed(edit, resume)
         if prop is None:
@@ -228,7 +215,7 @@ def prepare_job(
             known = answers_bank.get(claim_key(claim))
             if known is None:
                 unknown.append(claim)
-            elif normalize(known) not in ("yes", "y", "true"):
+            elif not is_yes(known):
                 denied = True
         if denied:
             continue  # you already told us you don't have this skill
@@ -247,7 +234,52 @@ def prepare_job(
                 field_type="radio", options=["Yes", "No"], reusable=True,
             )
 
-    job.status = JobStatus.NEEDS_INPUT
+
+def prepare_job(
+    s: Session,
+    job: Job,
+    llm: LLM,
+    resume: Resume,
+    profile: Profile,
+    log_: RunLog,
+    client: httpx.Client | None = None,
+) -> None:
+    answers_bank = bank(s)
+    if job.ats in (EASY_APPLY, EXTERNAL):
+        # Easy Apply questions are read when submitting; external sites you apply to yourself.
+        job.answers = job.answers or {}
+    else:
+        ats = get_ats(job.ats, client)
+        try:
+            fields = ats.get_form(job.company_token, job.external_id, job.apply_url)
+        except ATSError as exc:
+            job.status, job.status_reason = JobStatus.FAILED, f"Could not read the application form: {exc}"
+            s.add(job)
+            s.commit()
+            log_("! %s: %s", job.title, exc)
+            return
+        job.form_fields = [f.model_dump() for f in fields]
+        job.cover_letter_required = ats.needs_cover_letter(fields)
+        if job.cover_letter_required and not job.cover_letter:
+            try:
+                job.cover_letter = ai.cover_letter(llm, resume, job.title, job.company_name, job.description)
+            except LLMError as exc:
+                log_("! cover letter for %s failed: %s", job.title, exc)
+        ctx = Context(profile, answers_bank, job.location, cover_letter_available=bool(job.cover_letter))
+        resolution = resolve_form(fields, ctx)
+        job.answers = resolution.answers
+        s.add(job)
+        s.flush()
+        ask_about(s, job, resolution.unresolved, llm, resume)
+
+    suggest_edits(s, job, llm, resume, answers_bank, log_)
+
+    if job.ats == EXTERNAL:
+        host = urlparse(job.apply_url).netloc or "the company site"
+        job.status = JobStatus.APPLY_YOURSELF
+        job.status_reason = f"Apply on {host} yourself; your tailored resume is ready on this page"
+    else:
+        job.status = JobStatus.NEEDS_INPUT
     s.add(job)
     s.flush()
     refresh_status(s, job)
@@ -266,7 +298,7 @@ def run_daily(llm: LLM | None = None, client: httpx.Client | None = None, submit
             resume, profile = store.load_resume(), store.load_profile()
             llm = llm or get_llm(settings.llm)
             with db.session() as s:
-                discover(s, run_log, client)
+                discover(s, run_log, client, settings)
                 apply_filters(s, settings, run_log)
                 for job in score_jobs(s, llm, resume, settings, run_log):
                     prepare_job(s, job, llm, resume, profile, run_log, client)

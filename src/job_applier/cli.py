@@ -81,6 +81,13 @@ def cmd_add_company(args) -> None:
                     print(f"• {name}: already watching {ats} ({token})")
 
 
+def cmd_linkedin_login(args) -> None:
+    from job_applier.linkedin import session
+
+    print("A browser window will open. Sign in to LinkedIn there (2FA is fine); it closes when you're in.")
+    print("Logged in." if session.login_interactively() else "Sign-in didn't finish in time; try again.")
+
+
 def cmd_set_secret(args) -> None:
     from job_applier import secrets
 
@@ -126,6 +133,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("add-company", help="Watch companies (names or careers-board URLs)")
     p.add_argument("names", nargs="+")
     p.set_defaults(func=cmd_add_company)
+
+    sub.add_parser("linkedin-login", help="Sign in to LinkedIn in the bot's browser").set_defaults(func=cmd_linkedin_login)
 
     p = sub.add_parser("set-secret", help="Store an API key or password in the OS credential store")
     p.add_argument("name")

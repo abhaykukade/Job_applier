@@ -1,0 +1,110 @@
+<!doctype html>
+<!-- A stand-in for a logged-in LinkedIn job page with a 4-step Easy Apply dialog. -->
+<html><head><meta charset="utf-8"><title>Senior Backend Engineer | Umbrella | LinkedIn</title>
+<style>
+  .hidden-input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  [role=dialog] { border: 1px solid #999; padding: 12px; }
+</style></head>
+<body>
+<nav id="global-nav">LinkedIn</nav>
+<h1>Senior Backend Engineer</h1>
+<button class="jobs-apply-button" aria-label="Easy Apply to Senior Backend Engineer at Umbrella" onclick="openDialog()"><span>Easy Apply</span></button>
+<div id="root"></div>
+
+<script>
+window.submitted = null;
+window.discarded = false;
+let step = 0;
+const state = {};
+
+function q(label, inner) { return `<div class="jobs-easy-apply-form-section__grouping">${inner}</div>`; }
+const STEPS = [
+  () => `
+    <h3>Contact info</h3>
+    <div><label for="email-select"><span aria-hidden="true">Email address</span><span class="visually-hidden">Email address</span></label>
+      <select id="email-select" required><option>Select an option</option><option selected>jordan@example.com</option></select></div>
+    <div><label for="country-code"><span aria-hidden="true">Phone country code</span><span class="visually-hidden">Phone country code</span></label>
+      <select id="country-code" required><option>Select an option</option><option selected>United States (+1)</option><option>Canada (+1)</option></select></div>
+    <div><label for="phone-input">Mobile phone number</label><input id="phone-input" type="text" required value=""></div>
+    <div><label for="city-input">Location (city)</label><input id="city-input" role="combobox" aria-autocomplete="list" required value="Seattle, Washington, United States"></div>`,
+  () => `
+    <h3>Resume</h3>
+    <div class="jobs-document-upload">
+      <label for="jobs-document-upload-file-input-upload-resume" class="artdeco-button">Upload resume</label>
+      <input id="jobs-document-upload-file-input-upload-resume" name="file" type="file" class="hidden-input" onchange="state.resume=this.files[0].name">
+    </div>
+    <div class="jobs-document-upload">
+      <label for="jobs-document-upload-file-input-upload-cover-letter" class="artdeco-button">Upload cover letter</label>
+      <input id="jobs-document-upload-file-input-upload-cover-letter" name="file" type="file" class="hidden-input">
+    </div>`,
+  () => `
+    <h3>Additional Questions</h3>
+    <div><label for="years-python">How many years of work experience do you have with Python?</label>
+      <input id="years-python" type="text" required value="${state.years || ''}">
+      <div class="artdeco-inline-feedback artdeco-inline-feedback--error" id="years-error" hidden>Please enter a valid answer</div></div>
+    <fieldset data-test-form-builder-radio-button-form-component="true">
+      <legend><span aria-hidden="true">Will you now or in the future require sponsorship for employment visa status?</span><span class="visually-hidden">Will you now or in the future require sponsorship for employment visa status?</span></legend>
+      <div><input class="hidden-input" type="radio" name="sponsor-radio" id="sponsor-yes" value="Yes" required><label for="sponsor-yes">Yes</label></div>
+      <div><input class="hidden-input" type="radio" name="sponsor-radio" id="sponsor-no" value="No" required><label for="sponsor-no">No</label></div>
+    </fieldset>
+    <div><label for="hybrid-select"><span aria-hidden="true">Are you comfortable working in a hybrid setting?</span><span class="visually-hidden">Are you comfortable working in a hybrid setting?</span></label>
+      <select id="hybrid-select" required><option>Select an option</option><option>Yes</option><option>No</option></select></div>`,
+  () => `
+    <h3>Review your application</h3>
+    <input type="checkbox" id="follow-company-checkbox" class="hidden-input" checked>
+    <label for="follow-company-checkbox">Follow Umbrella to stay up to date with their page.</label>`,
+];
+
+function footer() {
+  if (step < 2) return `<button aria-label="Continue to next step" onclick="next()" type="button"><span>Next</span></button>`;
+  if (step === 2) return `<button aria-label="Review your application" onclick="next()" type="button"><span>Review</span></button>`;
+  return `<button aria-label="Submit application" onclick="submitApp()" type="button"><span>Submit application</span></button>`;
+}
+
+function render() {
+  document.getElementById('root').innerHTML = `
+    <div role="dialog" class="jobs-easy-apply-modal" aria-labelledby="t">
+      <button aria-label="Dismiss" onclick="dismiss()" type="button">×</button>
+      <h2 id="t">Apply to Umbrella</h2>
+      <form onsubmit="return false">${STEPS[step]()}<footer>${footer()}</footer></form>
+    </div>`;
+}
+
+function openDialog() { step = 0; render(); }
+
+function next() {
+  if (step === 0) {
+    state.phone = document.getElementById('phone-input').value;
+    state.city = document.getElementById('city-input').value;
+    if (!state.phone) return;
+  }
+  if (step === 2) {
+    const years = document.getElementById('years-python').value;
+    if (!/^\d+$/.test(years)) { document.getElementById('years-error').hidden = false; return; }
+    state.years = years;
+    const s = document.querySelector('input[name=sponsor-radio]:checked');
+    state.sponsor = s ? s.value : null;
+    state.hybrid = document.getElementById('hybrid-select').value;
+    if (!state.sponsor || state.hybrid === 'Select an option') return;
+  }
+  step += 1; render();
+}
+
+function submitApp() {
+  state.follow = document.getElementById('follow-company-checkbox').checked;
+  window.submitted = Object.assign({}, state);
+  document.getElementById('root').innerHTML = `
+    <div role="dialog" aria-labelledby="done"><h2 id="done">Your application was sent to Umbrella!</h2>
+    <button type="button" onclick="this.parentNode.remove()">Done</button></div>`;
+}
+
+function dismiss() {
+  document.getElementById('root').insertAdjacentHTML('beforeend', `
+    <div role="alertdialog" id="confirm"><p>Save this application?</p>
+      <button data-control-name="discard_application_confirm_btn" type="button" onclick="discardApp()">Discard</button>
+      <button type="button">Save</button></div>`);
+}
+
+function discardApp() { window.discarded = true; document.getElementById('root').innerHTML = ''; }
+</script>
+</body></html>

@@ -20,6 +20,7 @@ from sqlmodel import func, select
 
 from job_applier import db, secrets
 from job_applier.ats import SUPPORTED, ATSError, detect_company
+from job_applier.linkedin import session as li_session
 from job_applier.db import (
     AnswerBankEntry,
     Company,
@@ -132,7 +133,9 @@ def run_detail(request: Request, run_id: int):
 def queue(request: Request):
     groups = {}
     with db.session() as s:
-        for status in (JobStatus.NEEDS_INPUT, JobStatus.READY, JobStatus.APPROVED, JobStatus.MANUAL, JobStatus.FAILED):
+        for status in (
+            JobStatus.NEEDS_INPUT, JobStatus.READY, JobStatus.APPROVED, JobStatus.MANUAL, JobStatus.APPLY_YOURSELF, JobStatus.FAILED,
+        ):
             groups[status.value] = s.exec(
                 select(Job).where(Job.status == status).order_by(Job.score.desc(), Job.discovered_at.desc())
             ).all()
@@ -234,7 +237,7 @@ def suggestion_action(sid: int, action: str):
 def resume_pdf(job_id: int):
     with db.session() as s:
         job = _job_or_404(s, job_id)
-        if job.status not in (JobStatus.APPROVED, JobStatus.SUBMITTED, JobStatus.MANUAL, JobStatus.FAILED) or not job.resume_path:
+        if job.status not in (JobStatus.APPROVED, JobStatus.SUBMITTED) or not job.resume_path or not Path(job.resume_path).exists():
             review.build_documents(s, job)
             s.commit()
     return FileResponse(job.resume_path, media_type="application/pdf")
@@ -390,7 +393,19 @@ def setup(request: Request):
         has_secret={k: secrets.has_secret(k) for k in secrets.KNOWN},
         workplaces=get_args(Workplace),
         missing=profile.missing_essentials(),
+        linkedin=li_session.status(),
+        experience_levels=EXPERIENCE_LEVELS,
     )
+
+
+EXPERIENCE_LEVELS = {1: "Internship", 2: "Entry level", 3: "Associate", 4: "Mid-Senior", 5: "Director", 6: "Executive"}
+
+
+@app.post("/linkedin/login")
+def linkedin_login():
+    if not _start(li_session.login_interactively):
+        return go("/setup#linkedin", "Busy: wait for the current run to finish", True)
+    return go("/setup#linkedin", "A browser window opened: sign in to LinkedIn there (2FA is fine). This page shows the result once you're done.")
 
 
 @app.post("/setup/resume")
@@ -479,6 +494,22 @@ async def save_settings_form(request: Request):
     form = await request.form()
     s = load_settings()
     data = s.model_dump()
+    if form.get("section") == "linkedin":
+        li = data["linkedin"]
+        li["enabled"] = form.get("li_enabled") == "on"
+        li["queries"] = [line.strip() for line in str(form.get("li_queries", "")).splitlines() if line.strip()]
+        li["locations"] = [line.strip() for line in str(form.get("li_locations", "")).splitlines() if line.strip()]
+        li["posted_within"] = form.get("li_posted_within") or "r604800"
+        li["experience_levels"] = [int(x) for x in form.getlist("li_experience")]
+        li["pages_per_query"] = int(form.get("li_pages") or 2)
+        li["max_details_per_run"] = int(form.get("li_max_details") or 60)
+        li["min_delay_s"] = float(form.get("li_min_delay_s") or 60)
+        li["max_delay_s"] = float(form.get("li_max_delay_s") or 180)
+        try:
+            save_settings(Settings.model_validate(data))
+        except ValidationError as exc:
+            return go("/setup#linkedin", str(exc), True)
+        return go("/setup#linkedin", "LinkedIn settings saved")
     search = data["search"]
     for key in ("titles_include", "titles_exclude", "seniority_include", "seniority_exclude", "keywords", "locations"):
         search[key] = [line.strip() for line in str(form.get(key, "")).splitlines() if line.strip()]

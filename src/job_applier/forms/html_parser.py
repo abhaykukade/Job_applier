@@ -10,11 +10,23 @@ from job_applier.forms.models import FieldType, FormField, Option
 
 _SKIP_TYPES = {"hidden", "submit", "button", "reset", "image", "search", "password"}
 _REQUIRED_MARK = re.compile(r"[\s✱*]+$")
+_REQUIRED_WORD = re.compile(r"\s*\(?required\)?\s*$", re.I)
+_PLACEHOLDER = re.compile(r"^(select|choose|please select)\b", re.I)
 _CONTAINERS = {"application-question", "form-group", "field", "question", "form-field"}
 
 
 def _clean(text: str) -> str:
-    return _REQUIRED_MARK.sub("", re.sub(r"\s+", " ", text)).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    text = _REQUIRED_MARK.sub("", _REQUIRED_WORD.sub("", text)).strip()
+    # Sites like LinkedIn repeat the label in a visually-hidden span: "Question? Question?"
+    half = len(text) // 2
+    if len(text) % 2 == 1 and text[:half] == text[half + 1:]:
+        return text[:half]
+    return text
+
+
+def _marked_required(raw: str, tag: Tag) -> bool:
+    return "✱" in raw or "*" in raw or bool(_REQUIRED_WORD.search(raw)) or tag.select_one(".required") is not None
 
 
 def _container(el: Tag) -> Tag | None:
@@ -51,8 +63,7 @@ def _label_for(soup: BeautifulSoup, el: Tag) -> tuple[str, bool]:
         raw = cand.get_text(" ", strip=True)
         text = _clean(raw)
         if text:
-            required = "✱" in raw or "*" in raw or cand.select_one(".required") is not None
-            return text, required
+            return text, _marked_required(raw, cand)
     for attr in ("aria-label", "placeholder", "name"):
         if el.get(attr):
             return _clean(str(el[attr])), False
@@ -115,6 +126,7 @@ def parse_form(html: str, form_selector: str | None = None) -> list[FormField]:
                 Option(label=_clean(o.get_text(" ", strip=True)), value=str(o.get("value", o.get_text(strip=True))))
                 for o in el.find_all("option")
                 if o.get("value", o.get_text(strip=True)) not in ("", None)
+                and not _PLACEHOLDER.match(o.get_text(strip=True))
             ]
         else:
             ftype = {
@@ -122,9 +134,12 @@ def parse_form(html: str, form_selector: str | None = None) -> list[FormField]:
                 "number": "number", "date": "date", "file": "file",
             }.get(input_type, "text")  # type: ignore[assignment]
             options = []
+        if name in fields and el.get("id"):
+            name = el["id"]  # e.g. LinkedIn's resume and cover-letter inputs are both name="file"
+        meta = {"selector": f'[id="{el["id"]}"]'} if el.get("id") else {}
         fields[name] = FormField(
             key=name, label=label, type=ftype, required=required_attr or req, options=options,
-            section=_section(name, label),  # type: ignore[arg-type]
+            section=_section(name, label), meta=meta,  # type: ignore[arg-type]
         )
     return list(fields.values())
 
@@ -136,7 +151,7 @@ def _group_label(soup: BeautifulSoup, el: Tag) -> tuple[str, bool]:
             found = box.select_one(sel)
             if found is not None:
                 raw = found.get_text(" ", strip=True)
-                return _clean(raw), "✱" in raw or "*" in raw or found.select_one(".required") is not None
+                return _clean(raw), _marked_required(raw, found)
         first = box.find("label")
         if first is not None and first.find("input") is None:
             raw = first.get_text(" ", strip=True)

@@ -41,6 +41,13 @@ def routes(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=json.loads(fixture_text("ashby_jobs.json")))
     if "jobs.ashbyhq.com/api/non-user-graphql" in url:
         return httpx.Response(200, json=json.loads(fixture_text("ashby_form.json")))
+    if "linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search" in url:
+        first_page = request.url.params.get("start") == "0"
+        return httpx.Response(200, text=fixture_text("linkedin_search.html") if first_page else "")
+    if "linkedin.com/jobs-guest/jobs/api/jobPosting/" in url:
+        name = {"3900000111": "easy", "3900000222": "greenhouse", "3900000333": "workday"}.get(url.rsplit("/", 1)[-1])
+        if name:
+            return httpx.Response(200, text=fixture_text(f"linkedin_detail_{name}.html"))
     return httpx.Response(404, json={"error": "not found"})
 
 

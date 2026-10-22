@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 import time
 from pathlib import Path
 
@@ -45,14 +46,31 @@ def _tag(loc: Locator) -> str:
     return loc.first.evaluate("el => el.tagName.toLowerCase()")
 
 
-def _choose_combobox(page: Page, loc: Locator, value: str) -> None:
-    """Custom dropdowns (react-select and similar): type, then pick the matching option."""
+def _is_place(f: FormField) -> bool:
+    return f.type == "location" or bool(re.search(r"\b(city|location)\b", f.label, re.I))
+
+
+def _choose_combobox(page: Page, loc: Locator, value: str, place: bool = False) -> None:
+    """Custom dropdowns (react-select and similar): type, then pick the matching option.
+
+    For place typeaheads ("City"), type just the city and take the first suggestion
+    containing it, since suggestions read like "Seattle, Washington, United States".
+    """
     box = loc.first
     box.click()
+    typed = value.split(",")[0].strip() if place else value
     try:
-        box.fill(value)
+        box.fill(typed)
     except PlaywrightError:
-        box.press_sequentially(value, delay=40)
+        box.press_sequentially(typed, delay=40)
+    if place:
+        suggestion = page.get_by_role("option").filter(has_text=typed)
+        try:
+            suggestion.first.wait_for(timeout=4000)
+            suggestion.first.click()
+        except PlaywrightError:
+            box.press("Enter")
+        return
     option = page.get_by_role("option", name=value, exact=True)
     try:
         option.first.wait_for(timeout=2500)
@@ -85,16 +103,34 @@ def _click_button_choice(page: Page, f: FormField, label: str) -> bool:
     return False
 
 
+def _check(page: Page, box: Locator) -> None:
+    """Check a radio/checkbox, including ones hidden behind a styled label (LinkedIn)."""
+    try:
+        box.check(timeout=2500)
+        return
+    except PlaywrightError:
+        pass
+    box_id = box.get_attribute("id")
+    label = page.locator(f'label[for="{_attr(box_id)}"]') if box_id else None
+    if label is not None and label.count():
+        label.first.click()
+    else:
+        box.evaluate("el => el.click()")
+    if not box.is_checked():
+        raise LookupError("could not tick the option")
+
+
 def _check_options(page: Page, f: FormField, labels: list[str]) -> None:
+    scope = page.locator(f.meta["scope"]) if f.meta.get("scope") else page
     for label in labels:
         value = _option_value(f, label)
-        target = page.locator(f'[name="{_attr(f.key)}"][value="{_attr(value)}"]')
+        target = scope.locator(f'[name="{_attr(f.key)}"][value="{_attr(value)}"]')
         if target.count():
-            target.first.check()
+            _check(page, target.first)
             continue
-        by_label = page.get_by_label(label, exact=True)
+        by_label = scope.get_by_label(label, exact=True)
         if by_label.count():
-            by_label.first.check()
+            _check(page, by_label.first)
             continue
         if not _click_button_choice(page, f, label):
             raise LookupError(f"option {label!r} not found")
@@ -129,11 +165,11 @@ def fill_field(page: Page, f: FormField, value: str | list[str], files: dict[str
         return
     if f.type in ("select", "multi_select", "location") or loc.first.get_attribute("role") == "combobox":
         for v in values:
-            _choose_combobox(page, loc, v)
+            _choose_combobox(page, loc, v, place=_is_place(f))
         return
     if f.type == "checkbox" or loc.first.get_attribute("type") == "checkbox":
         if values[0].lower() in ("yes", "true", "on", "1"):
-            loc.first.check()
+            _check(page, loc.first)
         return
     loc.first.fill(values[0])
 

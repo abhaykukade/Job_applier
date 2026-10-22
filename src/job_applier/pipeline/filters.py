@@ -32,6 +32,7 @@ def check(
     workplace: str,
     posted_at: datetime | None,
     cfg: SearchSettings,
+    check_location: bool = True,
 ) -> str | None:
     """Return why the job is filtered out, or None if it passes."""
     if cfg.titles_include and not any(_has_word(title, t) for t in cfg.titles_include):
@@ -48,7 +49,7 @@ def check(
         return "none of your keywords appear"
     if workplace != "unknown" and workplace not in cfg.workplace:
         return f"{workplace} roles excluded"
-    if not _location_ok(location, workplace, cfg):
+    if check_location and not _location_ok(location, workplace, cfg):
         return f"location '{location}' not in your locations"
     if posted_at and cfg.max_age_days and posted_at < utcnow() - timedelta(days=cfg.max_age_days):
         return f"posted more than {cfg.max_age_days} days ago"

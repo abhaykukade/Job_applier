@@ -13,6 +13,9 @@
     {% if job.status.value == "ready" %}
     <form method="post" action="/jobs/{{ job.id }}/approve" class="inline"><button class="primary small">Approve</button></form>
     {% endif %}
+    {% if job.status.value == "apply_yourself" %}
+    <a href="{{ job.apply_url }}" target="_blank" rel="noopener" class="small">Apply ↗</a>
+    {% endif %}
     <form method="post" action="/jobs/{{ job.id }}/skip" class="inline"><button class="small">Skip</button></form>
   </td>
   {% endif %}

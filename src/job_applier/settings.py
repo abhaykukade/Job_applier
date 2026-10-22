@@ -44,10 +44,28 @@ class SubmitSettings(BaseModel):
     manual_wait_s: int = 300
 
 
+class LinkedInSettings(BaseModel):
+    enabled: bool = False
+    # Search phrases; empty = use your target titles.
+    queries: list[str] = Field(default_factory=list)
+    # LinkedIn locations, e.g. "United States", "Seattle, Washington"; empty = your search locations.
+    locations: list[str] = Field(default_factory=list)
+    # r86400 = past 24h, r604800 = past week, r2592000 = past month
+    posted_within: Literal["r86400", "r604800", "r2592000"] = "r604800"
+    # LinkedIn experience levels: 1 intern, 2 entry, 3 associate, 4 mid-senior, 5 director, 6 executive
+    experience_levels: list[int] = Field(default_factory=list)
+    pages_per_query: int = 2  # 25 results per page
+    max_details_per_run: int = 60  # job pages fetched per run (keeps traffic low)
+    # Pauses between LinkedIn applications are longer than for company sites.
+    min_delay_s: float = 60
+    max_delay_s: float = 180
+
+
 class Settings(BaseModel):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     search: SearchSettings = Field(default_factory=SearchSettings)
     submit: SubmitSettings = Field(default_factory=SubmitSettings)
+    linkedin: LinkedInSettings = Field(default_factory=LinkedInSettings)
     # Maximum submissions per day, per source.
     caps: dict[str, int] = Field(
         default_factory=lambda: {"greenhouse": 15, "lever": 15, "ashby": 15, "linkedin": 10}

@@ -25,6 +25,7 @@ class JobStatus(str, Enum):
     APPROVED = "approved"  # approved, queued for submission
     SUBMITTED = "submitted"
     MANUAL = "manual"  # needs you to finish it in the browser (CAPTCHA, verification)
+    APPLY_YOURSELF = "apply_yourself"  # good match on a site we can't apply on yet
     FAILED = "failed"
     SKIPPED = "skipped"  # you rejected it
 

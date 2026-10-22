@@ -65,7 +65,10 @@ def approve(s: Session, job_id: int) -> Job:
         raise ReviewError(f"Can't approve a job that is {job.status.value}")
     if open_questions(s, job.id):
         raise ReviewError("Answer this job's open questions first")
-    if not job.form_fields:
+    if job.ats == "external":
+        raise ReviewError("This job is applied to on the company's own site; apply there yourself")
+    # LinkedIn's Easy Apply questions are read while submitting, so there's no form yet.
+    if not job.form_fields and job.ats != "linkedin":
         raise ReviewError("The application form hasn't been read yet")
     build_documents(s, job)
     job.status, job.status_reason, job.approved_at = JobStatus.APPROVED, None, utcnow()

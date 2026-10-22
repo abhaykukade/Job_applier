@@ -79,6 +79,36 @@
   </form>
 </section>
 
+<section class="card" id="linkedin">
+  <h2>LinkedIn</h2>
+  <p class="muted">Searching uses LinkedIn's public job pages, never your account. Only Easy Apply submissions use your login, at the pace and daily cap set here. Automating applications is against LinkedIn's terms and can get an account restricted; keep the cap low.</p>
+  <div class="inline-form">
+    {% if linkedin.logged_in %}<span class="ok">✓ Logged in</span>{% else %}<span class="bad">Not logged in{% if linkedin.note %} ({{ linkedin.note }}){% endif %}</span>{% endif %}
+    <form method="post" action="/linkedin/login"><button {% if running %}disabled{% endif %}>{{ "Log in again" if linkedin.logged_in else "Log in to LinkedIn" }}</button></form>
+    <span class="muted">Opens the bot's browser; sign in there yourself. Your password is never stored.</span>
+  </div>
+  {% set li = settings.linkedin %}
+  <form method="post" action="/setup/settings" class="grid">
+    <input type="hidden" name="section" value="linkedin">
+
+    <label class="check span"><input type="checkbox" name="li_enabled" {% if li.enabled %}checked{% endif %}> Search LinkedIn in the daily run</label>
+    <label>Search phrases <span class="muted">(one per line; blank = your target titles)</span><textarea name="li_queries" rows="4">{{ li.queries | join("\n") }}</textarea></label>
+    <label>LinkedIn locations <span class="muted">(e.g. United States; blank = your search locations)</span><textarea name="li_locations" rows="4">{{ li.locations | join("\n") }}</textarea></label>
+    <label>Posted within
+      <select name="li_posted_within">
+        {% for v, t in (("r86400", "Past 24 hours"), ("r604800", "Past week"), ("r2592000", "Past month")) %}<option value="{{ v }}" {% if li.posted_within == v %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <fieldset><legend>Experience levels <span class="muted">(none = all)</span></legend>
+      {% for code, name in experience_levels.items() %}<label class="check"><input type="checkbox" name="li_experience" value="{{ code }}" {% if code in li.experience_levels %}checked{% endif %}> {{ name }}</label>{% endfor %}
+    </fieldset>
+    <label>Result pages per search <span class="muted">(25 jobs each)</span><input type="number" name="li_pages" value="{{ li.pages_per_query }}"></label>
+    <label>Max job pages read per run<input type="number" name="li_max_details" value="{{ li.max_details_per_run }}"></label>
+    <label class="inline span">Pause between LinkedIn applications (s) <input type="number" name="li_min_delay_s" value="{{ li.min_delay_s }}" class="narrow"> to <input type="number" name="li_max_delay_s" value="{{ li.max_delay_s }}" class="narrow"> · daily cap: {{ settings.caps.linkedin }} (change under Search & limits)</label>
+    <button class="primary span">Save LinkedIn settings</button>
+  </form>
+</section>
+
 <section class="card" id="secrets">
   <h2>4. Keys & passwords</h2>
   <p class="muted">Stored in Windows Credential Manager, never in files. Leave a box blank to keep the current value.</p>

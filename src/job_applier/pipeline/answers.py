@@ -54,7 +54,13 @@ def open_questions(s: Session, job_id: int | None = None) -> list[Question]:
 def refresh_status(s: Session, job: Job) -> None:
     if job.status not in (JobStatus.NEEDS_INPUT, JobStatus.READY):
         return
-    job.status = JobStatus.NEEDS_INPUT if open_questions(s, job.id) else JobStatus.READY
+    if open_questions(s, job.id):
+        job.status = JobStatus.NEEDS_INPUT
+    elif job.approved_at and job.resume_path:
+        # Held during submission (e.g. LinkedIn asked something new): back in the queue.
+        job.status = JobStatus.APPROVED
+    else:
+        job.status = JobStatus.READY
     s.add(job)
 
 

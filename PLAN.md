@@ -87,7 +87,7 @@ job_applier/
 
 ## Milestones
 
-Status: milestones **1–4 are built** (Greenhouse/Lever/Ashby first, as agreed). Remaining: 5–7.
+Status: milestones **1–5 are built**. Remaining: 6–7.
 Live API shapes are covered by recorded fixtures and still need a first real run on your PC
 (this sandbox can't reach the job boards).
 
@@ -100,7 +100,9 @@ Live API shapes are covered by recorded fixtures and still need a first real run
    answers, cover letters.
 4. ✅ **ATS appliers (high tier)**: Greenhouse, Lever, Ashby, with a dry-run mode
    that fills forms without submitting.
-5. **LinkedIn**: search plus assisted Easy Apply.
+5. ✅ **LinkedIn**: search through LinkedIn's public job pages (no account use), routing by
+   apply link (Easy Apply / our ATSs / apply-yourself), and assisted Easy Apply after approval.
+   Questions are read at submit time; unknown ones hold the job and ask you.
 6. **Workday / iCIMS / Taleo** appliers (best-effort).
 7. **Scheduling + polish**: Task Scheduler registration, run reports, retries.
 

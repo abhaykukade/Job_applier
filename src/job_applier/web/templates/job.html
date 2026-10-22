@@ -6,7 +6,7 @@
   <div class="row-between">
     <div>
       <h1>{{ job.title }}</h1>
-      <div class="muted">{{ job.company_name }} · {{ job.location or "Location not listed" }} · {{ job.workplace }} · via {{ job.ats }}</div>
+      <div class="muted">{{ job.company_name }} · {{ job.location or "Location not listed" }} · {{ job.workplace }} · via {{ {"linkedin": "LinkedIn Easy Apply", "external": "LinkedIn → company site"}.get(job.ats, job.ats) }}</div>
       <div><span class="status {{ job.status.value }}">{{ job.status.value | replace("_", " ") }}</span> {% if job.status_reason %}<span class="muted">{{ job.status_reason }}</span>{% endif %}</div>
     </div>
     <div class="big-score">{{ score(job) }}</div>
@@ -18,11 +18,11 @@
     {% if job.screenshot_path %}<a href="/jobs/{{ job.id }}/screenshot" target="_blank">Last screenshot</a>{% endif %}
   </div>
   <div class="actions">
-    {% if job.status.value in ("ready", "manual", "failed") %}
+    {% if job.status.value in ("ready", "manual", "failed") and job.ats != "external" %}
     <form method="post" action="/jobs/{{ job.id }}/approve"><button class="primary" {% if questions %}disabled title="Answer the questions first"{% endif %}>{% if job.status.value == "ready" %}Approve{% else %}Retry submission{% endif %}</button></form>
     {% endif %}
-    {% if job.status.value in ("manual", "failed") %}
-    <form method="post" action="/jobs/{{ job.id }}/mark-submitted"><button>I finished it myself</button></form>
+    {% if job.status.value in ("manual", "failed", "apply_yourself") %}
+    <form method="post" action="/jobs/{{ job.id }}/mark-submitted"><button {% if job.status.value == "apply_yourself" %}class="primary"{% endif %}>{{ "I applied" if job.status.value == "apply_yourself" else "I finished it myself" }}</button></form>
     {% endif %}
     {% if job.status.value not in ("submitted", "skipped") %}
     <form method="post" action="/jobs/{{ job.id }}/skip"><button>Skip</button></form>
@@ -90,6 +90,12 @@
 </section>
 {% endif %}
 
+{% if job.ats == "linkedin" and not fields %}
+<section class="card">
+  <h2>Application answers</h2>
+  <p class="muted">LinkedIn shows its questions only inside the Easy Apply dialog, so they're read while submitting. Anything new is asked here and on the Questions page, and the job goes back in the queue once you answer.</p>
+</section>
+{% endif %}
 {% if fields %}
 <section class="card">
   <h2>Application answers</h2>
