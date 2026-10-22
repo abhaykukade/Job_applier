@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macros.html" import job_row %}
+{% block content %}
+<h1>History</h1>
+<div class="actions">
+  {% for st in statuses %}<a href="/history?status={{ st }}" class="{{ 'active' if st == status else '' }}">{{ st | replace("_", " ") }}</a>{% endfor %}
+</div>
+<table class="jobs">
+  <thead><tr><th>Score</th><th>Role</th><th>Location</th><th>Notes</th></tr></thead>
+  <tbody>{% for job in jobs %}{{ job_row(job, actions=false) }}{% else %}<tr><td colspan="4" class="empty">Nothing here.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

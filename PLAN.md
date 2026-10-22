@@ -37,8 +37,8 @@ template's look.
 
 ```
 job_applier/
-  config/            settings.yaml (filters, caps, schedule, LLM provider)
-  data/              ← gitignored: profile, resume.yaml, answer bank, DB, browser profile, outputs
+
+  data/              ← gitignored: settings, profile, resume.yaml, answer bank, DB, browser profile, outputs
   src/job_applier/
     llm/             provider interface + anthropic / openai / ollama adapters (structured JSON output)
     profile/         resume import (DOCX/PDF → YAML), profile model, answer bank, EEO answers
@@ -86,14 +86,19 @@ job_applier/
   creation and email-verification steps will often need you.
 
 ## Milestones
-1. **Foundation**: project skeleton, config, SQLite models, LLM provider
+
+Status: milestones **1–4 are built** (Greenhouse/Lever/Ashby first, as agreed). Remaining: 5–7.
+Live API shapes are covered by recorded fixtures and still need a first real run on your PC
+(this sandbox can't reach the job boards).
+
+1. ✅ **Foundation**: project skeleton, config, SQLite models, LLM provider
    interface, resume import → YAML, PDF/DOCX rendering, first-run setup wizard
    in the dashboard.
-2. **Discovery + queue**: Greenhouse/Lever/Ashby/Workday sources, filters,
+2. ✅ **Discovery + queue**: Greenhouse/Lever/Ashby sources (Workday moves to 6), filters,
    scoring, dashboard queue.
-3. **Tailoring + ask flow**: suggestion diffs, gap questions, answer bank, EEO
+3. ✅ **Tailoring + ask flow**: suggestion diffs, gap questions, answer bank, EEO
    answers, cover letters.
-4. **ATS appliers (high tier)**: Greenhouse, Lever, Ashby, with a `--dry-run`
+4. ✅ **ATS appliers (high tier)**: Greenhouse, Lever, Ashby, with a dry-run mode
    that fills forms without submitting.
 5. **LinkedIn**: search plus assisted Easy Apply.
 6. **Workday / iCIMS / Taleo** appliers (best-effort).

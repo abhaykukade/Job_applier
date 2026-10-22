@@ -1,0 +1,71 @@
+<html><body>
+<form id="application-form" method="POST" enctype="multipart/form-data">
+  <ul>
+    <li class="application-question resume">
+      <label><div class="application-label">Resume/CV<span class="required">✱</span></div>
+      <div class="application-field"><input type="file" name="resume" id="resume-upload-input"></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">Full name<span class="required">✱</span></div>
+      <div class="application-field"><input type="text" name="name" required></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">Email<span class="required">✱</span></div>
+      <div class="application-field"><input type="email" name="email" required></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">Phone</div>
+      <div class="application-field"><input type="text" name="phone"></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">Current company</div>
+      <div class="application-field"><input type="text" name="org"></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">LinkedIn URL</div>
+      <div class="application-field"><input type="text" name="urls[LinkedIn]"></div></label>
+    </li>
+    <li class="application-question custom-question">
+      <div class="application-label">Are you authorized to work in the US?<span class="required">✱</span></div>
+      <div class="application-field">
+        <ul>
+          <li><label><input type="radio" name="cards[abc][field0]" value="Yes" required>Yes</label></li>
+          <li><label><input type="radio" name="cards[abc][field0]" value="No">No</label></li>
+        </ul>
+      </div>
+    </li>
+    <li class="application-question custom-question">
+      <div class="application-label">Which of these have you used?<span class="required">✱</span></div>
+      <div class="application-field">
+        <ul>
+          <li><label><input type="checkbox" name="cards[abc][field1]" value="Kafka">Kafka</label></li>
+          <li><label><input type="checkbox" name="cards[abc][field1]" value="Spark">Spark</label></li>
+        </ul>
+      </div>
+    </li>
+    <li class="application-question custom-question">
+      <label><div class="application-label">Preferred office<span class="required">✱</span></div>
+      <div class="application-field"><select name="cards[abc][field2]" required>
+        <option value="">Select...</option><option value="sea">Seattle</option><option value="sf">San Francisco</option>
+      </select></div></label>
+    </li>
+    <li class="application-question">
+      <label><div class="application-label">Additional information</div>
+      <div class="application-field"><textarea name="comments"></textarea></div></label>
+    </li>
+    <li class="application-question eeo">
+      <label><div class="application-label">Gender</div>
+      <select name="eeo[gender]"><option value="">Select ...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Decline to self-identify">Decline to self-identify</option></select></label>
+    </li>
+  </ul>
+  <input type="hidden" name="accountId" value="x">
+  <button type="submit" id="btn-submit">Submit application</button>
+</form>
+<div id="result"></div>
+<script>
+  document.getElementById('application-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    document.body.innerHTML = '<h3>Application submitted!</h3><p>Thanks for applying.</p>';
+  });
+</script>
+</body></html>

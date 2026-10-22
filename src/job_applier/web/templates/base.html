@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Job Applier{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <nav>
+    <a class="brand" href="/">Job Applier</a>
+    <a href="/">Queue{% if nav.ready %} <span class="pill">{{ nav.ready }}</span>{% endif %}</a>
+    <a href="/questions">Questions{% if nav.questions %} <span class="pill warn">{{ nav.questions }}</span>{% endif %}</a>
+    <a href="/companies">Companies</a>
+    <a href="/history">History</a>
+    <a href="/runs">Runs{% if running %} <span class="pill live">running</span>{% endif %}</a>
+    <a href="/setup">Setup</a>
+  </nav>
+  <div class="actions">
+    <form method="post" action="/run/daily"><button {% if running %}disabled{% endif %}>Search now</button></form>
+    <form method="post" action="/run/submit"><button class="primary" {% if running or not nav.approved %}disabled{% endif %}>Submit approved ({{ nav.approved }}){% if settings.submit.dry_run %}, dry run{% endif %}</button></form>
+  </div>
+</header>
+<main>
+  {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+  {% if err %}<div class="flash err">{{ err }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

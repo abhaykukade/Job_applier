@@ -1,0 +1,46 @@
+{% macro score(job) -%}
+{% if job.score is not none %}<span class="score {% if job.score >= 80 %}hi{% elif job.score >= 65 %}mid{% else %}lo{% endif %}">{{ job.score }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro job_row(job, actions=true) -%}
+<tr>
+  <td>{{ score(job) }}</td>
+  <td><a href="/jobs/{{ job.id }}"><strong>{{ job.title }}</strong></a><div class="muted">{{ job.company_name }} · {{ job.ats }}</div></td>
+  <td>{{ job.location or "—" }}<div class="muted">{{ job.workplace }}</div></td>
+  <td class="muted">{{ job.status_reason or "" }}</td>
+  {% if actions %}
+  <td class="nowrap">
+    {% if job.status.value == "ready" %}
+    <form method="post" action="/jobs/{{ job.id }}/approve" class="inline"><button class="primary small">Approve</button></form>
+    {% endif %}
+    <form method="post" action="/jobs/{{ job.id }}/skip" class="inline"><button class="small">Skip</button></form>
+  </td>
+  {% endif %}
+</tr>
+{%- endmacro %}
+
+{% macro question_form(q, back, job=None, count=1) -%}
+<form method="post" action="/questions/{{ q.id }}" class="question">
+  <input type="hidden" name="back" value="{{ back }}">
+  <div class="q-prompt">{{ q.prompt }}</div>
+  {% if job %}<div class="muted">For {{ job.title }} @ {{ job.company_name }}{% if count > 1 %} and {{ count - 1 }} more job{{ "s" if count > 2 }}{% endif %}</div>{% endif %}
+  {% if q.options %}
+    {% if q.field_type in ("multi_select", "checkbox") and q.options|length > 1 %}
+      <input name="answer" placeholder="Pick one or more, separated by ;" value="{{ q.draft or '' }}" list="opts{{ q.id }}">
+      <div class="muted">Options: {{ q.options | join(" · ") }}</div>
+    {% else %}
+      <select name="answer">
+        <option value="">Choose…</option>
+        {% for o in q.options %}<option {% if q.draft == o %}selected{% endif %}>{{ o }}</option>{% endfor %}
+      </select>
+    {% endif %}
+  {% elif q.field_type == "textarea" %}
+    <textarea name="answer" rows="5">{{ q.draft or "" }}</textarea>
+  {% else %}
+    <input name="answer" value="{{ q.draft or '' }}">
+  {% endif %}
+  {% if q.draft %}<div class="muted">Draft suggested from your resume. Check it before saving.</div>{% endif %}
+  <label class="check"><input type="checkbox" name="reuse" {% if q.reusable or q.kind == "claim" %}checked{% endif %}> Remember this answer for future applications</label>
+  <button class="primary small">Save answer</button>
+</form>
+{%- endmacro %}

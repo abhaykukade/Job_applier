@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Companies</h1>
+<p class="muted">Greenhouse, Lever and Ashby have no global search, so each run checks the job boards of the companies listed here.</p>
+<section class="card">
+  <form method="post" action="/companies" class="grid">
+    <label>Company name or careers-board URL
+      <input name="name" required placeholder="e.g. Stripe, or https://jobs.lever.co/acme">
+    </label>
+    <details>
+      <summary>Know the ATS and board token?</summary>
+      <label>ATS <select name="ats"><option value="">Auto-detect</option>{% for a in supported %}<option>{{ a }}</option>{% endfor %}</select></label>
+      <label>Board token <input name="token" placeholder="the part after the domain, e.g. stripe"></label>
+    </details>
+    <button class="primary">Add</button>
+  </form>
+</section>
+<table class="jobs">
+  <thead><tr><th>Company</th><th>ATS</th><th>Token</th><th>Jobs seen</th><th>Last checked</th><th></th></tr></thead>
+  {% for c in companies %}
+  <tr class="{{ '' if c.active else 'inactive' }}">
+    <td>{{ c.name }}</td><td>{{ c.ats }}</td><td><code>{{ c.token }}</code></td>
+    <td>{{ open_counts.get(c.token, 0) }}</td>
+    <td class="muted">{{ c.last_checked_at.strftime("%Y-%m-%d %H:%M") if c.last_checked_at else "never" }}{% if c.last_error %}<div class="bad">{{ c.last_error }}</div>{% endif %}</td>
+    <td class="nowrap">
+      <form method="post" action="/companies/{{ c.id }}/toggle" class="inline"><button class="small">{{ "Pause" if c.active else "Resume" }}</button></form>
+      <form method="post" action="/companies/{{ c.id }}/delete" class="inline"><button class="small">Remove</button></form>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="empty">No companies yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

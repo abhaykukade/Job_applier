@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import question_form %}
+{% block content %}
+<h1>Questions</h1>
+<p class="muted">Applications that need these answers are on hold. An answer you remember fills the same question on every job that asks it, now and later.</p>
+{% for q in questions %}
+<section class="card">{{ question_form(q, "/questions", jobs.get(q.job_id), counts[q.key]) }}</section>
+{% else %}
+<p class="empty">No open questions. 🎉</p>
+{% endfor %}
+
+<h2>Answer bank <span class="muted">({{ bank|length }})</span></h2>
+<p class="muted">Saved answers used automatically. Delete one to be asked again next time.</p>
+<table class="fields">
+  {% for e in bank %}
+  <tr>
+    <td>{{ e.question | replace("\n", " ") | truncate(140) }}{% if e.key.startswith("claim:") %} <span class="muted">(skill confirmation)</span>{% endif %}</td>
+    <td><strong>{{ e.answer | truncate(200) }}</strong></td>
+    <td><form method="post" action="/answers/delete"><input type="hidden" name="key" value="{{ e.key }}"><button class="small">Delete</button></form></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

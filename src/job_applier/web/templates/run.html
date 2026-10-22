@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+{% if run.status == "running" %}<meta http-equiv="refresh" content="3">{% endif %}
+<h1>Run #{{ run.id }} · {{ run.kind }} · <span class="status {{ run.status }}">{{ run.status }}</span></h1>
+<pre class="log">{{ run.log }}</pre>
+{% endblock %}

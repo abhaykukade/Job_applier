@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Runs</h1>
+{% if running %}<meta http-equiv="refresh" content="5">{% endif %}
+<table class="jobs">
+  <thead><tr><th>#</th><th>Kind</th><th>Started (UTC)</th><th>Status</th><th>Stats</th></tr></thead>
+  {% for r in runs %}
+  <tr>
+    <td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td><td>{{ r.kind }}</td>
+    <td>{{ r.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+    <td class="muted">{% for k, v in (r.stats or {}).items() %}{{ k | replace("_", " ") }}: {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">No runs yet.</td></tr>{% endfor %}
+</table>
+{% endblock %}

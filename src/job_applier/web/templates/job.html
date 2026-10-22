@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score, question_form %}
+{% block title %}{{ job.title }} · {{ job.company_name }}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="row-between">
+    <div>
+      <h1>{{ job.title }}</h1>
+      <div class="muted">{{ job.company_name }} · {{ job.location or "Location not listed" }} · {{ job.workplace }} · via {{ job.ats }}</div>
+      <div><span class="status {{ job.status.value }}">{{ job.status.value | replace("_", " ") }}</span> {% if job.status_reason %}<span class="muted">{{ job.status_reason }}</span>{% endif %}</div>
+    </div>
+    <div class="big-score">{{ score(job) }}</div>
+  </div>
+  <div class="actions">
+    <a href="{{ job.url or job.apply_url }}" target="_blank" rel="noopener">Job posting ↗</a>
+    <a href="{{ job.apply_url }}" target="_blank" rel="noopener">Application page ↗</a>
+    <a href="/jobs/{{ job.id }}/resume.pdf" target="_blank">Preview tailored resume (PDF)</a>
+    {% if job.screenshot_path %}<a href="/jobs/{{ job.id }}/screenshot" target="_blank">Last screenshot</a>{% endif %}
+  </div>
+  <div class="actions">
+    {% if job.status.value in ("ready", "manual", "failed") %}
+    <form method="post" action="/jobs/{{ job.id }}/approve"><button class="primary" {% if questions %}disabled title="Answer the questions first"{% endif %}>{% if job.status.value == "ready" %}Approve{% else %}Retry submission{% endif %}</button></form>
+    {% endif %}
+    {% if job.status.value in ("manual", "failed") %}
+    <form method="post" action="/jobs/{{ job.id }}/mark-submitted"><button>I finished it myself</button></form>
+    {% endif %}
+    {% if job.status.value not in ("submitted", "skipped") %}
+    <form method="post" action="/jobs/{{ job.id }}/skip"><button>Skip</button></form>
+    {% endif %}
+  </div>
+</section>
+
+{% if job.match %}
+<section class="card">
+  <h2>Match</h2>
+  <p>{{ job.match.summary }}</p>
+  <div class="cols">
+    <div><h3>Strengths</h3><ul>{% for x in job.match.strengths %}<li>{{ x }}</li>{% endfor %}</ul></div>
+    <div><h3>Gaps</h3><ul>{% for x in job.match.gaps %}<li>{{ x }}</li>{% endfor %}</ul>
+      {% if job.match.dealbreakers %}<h3>Possible dealbreakers</h3><ul class="bad">{% for x in job.match.dealbreakers %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if questions %}
+<section class="card warn" id="questions">
+  <h2>Questions for you ({{ questions|length }})</h2>
+  {% for q in questions %}{{ question_form(q, "/jobs/" ~ job.id ~ "#questions") }}{% endfor %}
+</section>
+{% endif %}
+
+<section class="card" id="resume">
+  <div class="row-between">
+    <h2>Suggested resume edits</h2>
+    {% if suggestions|selectattr("status.value", "equalto", "pending")|list %}
+    <form method="post" action="/jobs/{{ job.id }}/accept-all"><button class="small">Accept all pending</button></form>
+    {% endif %}
+  </div>
+  <p class="muted">Only accepted edits go into this job's resume. Your master resume never changes.</p>
+  {% for sug in suggestions %}
+  <div class="suggestion {{ sug.status.value }}">
+    <div class="row-between">
+      <strong>{{ sug.kind | replace("_", " ") }}</strong>
+      <span class="status {{ sug.status.value }}">{{ sug.status.value }}</span>
+    </div>
+    <div class="diff">
+      <div class="before"><div class="muted">Before</div>{{ sug.before or "(empty)" }}</div>
+      <div class="after"><div class="muted">After</div>{{ sug.after }}</div>
+    </div>
+    <div class="muted">Why: {{ sug.rationale }}</div>
+    {% if sug.status.value == "blocked" %}<div class="muted">Waiting for you to confirm: <strong>{{ sug.claim }}</strong> (see Questions above).</div>{% endif %}
+    {% if sug.status.value in ("pending", "rejected", "accepted") %}
+    <div class="actions">
+      {% if sug.status.value != "accepted" %}<form method="post" action="/suggestions/{{ sug.id }}/accept"><button class="small primary">Accept</button></form>{% endif %}
+      {% if sug.status.value != "rejected" %}<form method="post" action="/suggestions/{{ sug.id }}/reject"><button class="small">Reject</button></form>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% else %}<p class="empty">No edits suggested: your resume already fits this role.</p>{% endfor %}
+</section>
+
+{% if job.cover_letter_required or job.cover_letter %}
+<section class="card">
+  <h2>Cover letter {% if job.cover_letter_required %}<span class="muted">(required by this application)</span>{% endif %}</h2>
+  <form method="post" action="/jobs/{{ job.id }}/cover-letter">
+    <textarea name="text" rows="14">{{ job.cover_letter or "" }}</textarea>
+    <button class="small">Save cover letter</button>
+  </form>
+</section>
+{% endif %}
+
+{% if fields %}
+<section class="card">
+  <h2>Application answers</h2>
+  <p class="muted">These get typed into the form. Edit anything, or leave a field blank to skip it.</p>
+  <form method="post" action="/jobs/{{ job.id }}/answers">
+    <table class="fields">
+      {% for f in fields %}
+      {% set val = (job.answers or {}).get(f.key) %}
+      <tr>
+        <td>{{ f.label }}{% if f.required %} <span class="req">*</span>{% endif %}<div class="muted">{{ f.type }}{% if f.section == "eeo" %} · voluntary self-ID{% endif %}</div></td>
+        <td>
+          {% if f.type == "file" %}<span class="muted">{{ "your tailored resume" if val == "@resume" else "your cover letter" if val == "@cover_letter" else val or "—" }}</span>
+          {% elif f.options and f.type not in ("multi_select",) %}
+            <select name="field:{{ f.key }}"><option value="">(blank)</option>{% for o in f.options %}<option {% if val == o.label %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</select>
+          {% elif f.type == "textarea" %}<textarea name="field:{{ f.key }}" rows="3">{{ val or "" }}</textarea>
+          {% else %}<input name="field:{{ f.key }}" value="{{ val | join('; ') if val is iterable and val is not string else val or '' }}">{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <button class="small">Save answers</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card">
+  <details><summary>Job description</summary><pre class="desc">{{ job.description }}</pre></details>
+</section>
+{% endblock %}

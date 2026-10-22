@@ -1,0 +1,19 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "11111111-2222-3333-4444-555555555555",
+      "title": "Senior Software Engineer",
+      "location": "Remote",
+      "secondaryLocations": [],
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "isListed": true,
+      "descriptionPlain": "Python, Postgres, distributed systems.",
+      "publishedAt": "2026-10-19T12:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/11111111-2222-3333-4444-555555555555",
+      "applyUrl": "https://jobs.ashbyhq.com/initech/11111111-2222-3333-4444-555555555555/application"
+    },
+    {"id": "unlisted", "title": "Hidden", "location": "Remote", "isListed": false, "jobUrl": "", "applyUrl": ""}
+  ]
+}

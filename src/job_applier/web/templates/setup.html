@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Setup</h1>
+
+<section class="card" id="resume">
+  <h2>1. Resume</h2>
+  <form method="post" action="/setup/resume" enctype="multipart/form-data" class="inline-form">
+    <input type="file" name="file" accept=".pdf,.docx,.txt" required>
+    <button class="primary">{{ "Re-import" if resume_yaml else "Import" }} resume</button>
+  </form>
+  <p class="muted">Your DOCX or PDF is converted once into a structured master resume, and tailored copies are built from it. Imports need the LLM key (step 4) first.</p>
+  {% if resume_yaml %}
+  <form method="post" action="/setup/resume-yaml">
+    <textarea name="content" rows="22" class="mono">{{ resume_yaml }}</textarea>
+    <button>Save resume</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card" id="profile">
+  <h2>2. Profile <span class="muted">(answers for application forms)</span></h2>
+  {% if missing %}<div class="flash err">Still needed: {{ missing | join(", ") }}</div>{% endif %}
+  <form method="post" action="/setup/profile" class="grid">
+    {% for f in profile_fields %}
+    <label>{{ f.label }}
+      {% if f.kind == "bool" %}
+      <select name="{{ f.name }}">
+        <option value="" {% if f.value is none %}selected{% endif %}>Not set (ask me)</option>
+        <option value="yes" {% if f.value == true %}selected{% endif %}>Yes</option>
+        <option value="no" {% if f.value == false %}selected{% endif %}>No</option>
+      </select>
+      {% elif f.kind == "list" %}
+      <input name="{{ f.name }}" value="{{ f.value | join(', ') }}" placeholder="comma separated, e.g. United States">
+      {% else %}
+      <input name="{{ f.name }}" value="{{ f.value if f.value is not none else '' }}">
+      {% endif %}
+    </label>
+    {% endfor %}
+    <h3 class="span">Voluntary self-identification (EEO), entered once and reused</h3>
+    {% for k in eeo_fields %}
+    <label>{{ k.replace("_", " ") | capitalize }}<input name="eeo_{{ k }}" value="{{ profile.eeo[k] }}"></label>
+    {% endfor %}
+    <button class="primary span">Save profile</button>
+  </form>
+</section>
+
+<section class="card" id="search">
+  <h2>3. Search & limits</h2>
+  <form method="post" action="/setup/suggest-search" class="inline-form"><button class="small">Suggest titles & keywords from my resume</button></form>
+  <form method="post" action="/setup/settings" class="grid">
+    {% set sch = settings.search %}
+    <label>Target titles <span class="muted">(one per line; the title must contain one)</span><textarea name="titles_include" rows="5">{{ sch.titles_include | join("\n") }}</textarea></label>
+    <label>Excluded title words<textarea name="titles_exclude" rows="5">{{ sch.titles_exclude | join("\n") }}</textarea></label>
+    <label>Seniority: must include one <span class="muted">(e.g. Senior, Staff; blank = any)</span><textarea name="seniority_include" rows="3">{{ sch.seniority_include | join("\n") }}</textarea></label>
+    <label>Seniority: exclude<textarea name="seniority_exclude" rows="3">{{ sch.seniority_exclude | join("\n") }}</textarea></label>
+    <label>Keywords <span class="muted">(at least one in title/description; blank = no check)</span><textarea name="keywords" rows="4">{{ sch.keywords | join("\n") }}</textarea></label>
+    <label>Locations <span class="muted">(e.g. Seattle, United States; blank = anywhere)</span><textarea name="locations" rows="4">{{ sch.locations | join("\n") }}</textarea></label>
+    <fieldset><legend>Workplace</legend>{% for w in workplaces %}<label class="check"><input type="checkbox" name="workplace" value="{{ w }}" {% if w in sch.workplace %}checked{% endif %}> {{ w }}</label>{% endfor %}</fieldset>
+    <label>Ignore jobs older than (days)<input type="number" name="max_age_days" value="{{ sch.max_age_days }}"></label>
+    <label>Minimum match score (0–100)<input type="number" name="min_score" value="{{ settings.min_score }}"></label>
+    <label>Max jobs scored per run <span class="muted">(limits LLM cost)</span><input type="number" name="max_scored_per_run" value="{{ settings.max_scored_per_run }}"></label>
+    <fieldset class="span"><legend>Daily submission caps</legend>
+      {% for ats, cap in settings.caps.items() %}<label class="inline">{{ ats }} <input type="number" name="cap_{{ ats }}" value="{{ cap }}" class="narrow"></label>{% endfor %}
+    </fieldset>
+    <fieldset class="span"><legend>Submitting</legend>
+      <label class="check"><input type="checkbox" name="dry_run" {% if settings.submit.dry_run %}checked{% endif %}> Dry run: fill forms and screenshot them, but don't press submit</label>
+      <label class="check"><input type="checkbox" name="headless" {% if settings.submit.headless %}checked{% endif %}> Hidden browser <span class="muted">(you can't solve CAPTCHAs then)</span></label>
+      <label class="inline">Delay between applications (s) <input type="number" name="min_delay_s" value="{{ settings.submit.min_delay_s }}" class="narrow"> to <input type="number" name="max_delay_s" value="{{ settings.submit.max_delay_s }}" class="narrow"></label>
+    </fieldset>
+    <fieldset class="span"><legend>AI model</legend>
+      <label class="inline">Provider <select name="llm_provider">{% for p in ("anthropic", "openai", "ollama") %}<option {% if settings.llm.provider == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+      <label class="inline">Model <input name="llm_model" value="{{ settings.llm.model }}"></label>
+      <label class="inline">Effort <select name="llm_effort">{% for e in ("low", "medium", "high", "xhigh", "max") %}<option {% if settings.llm.effort == e %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></label>
+      <label class="inline">Base URL <input name="llm_base_url" value="{{ settings.llm.base_url or '' }}" placeholder="Ollama: http://localhost:11434"></label>
+    </fieldset>
+    <label>Daily run time <span class="muted">(used by <code>jobapplier register-task</code>)</span><input name="schedule_time" value="{{ settings.schedule_time }}"></label>
+    <label>Chromium path <span class="muted">(blank = Playwright's)</span><input name="browser_executable" value="{{ settings.browser_executable or '' }}"></label>
+    <button class="primary span">Save settings</button>
+  </form>
+</section>
+
+<section class="card" id="secrets">
+  <h2>4. Keys & passwords</h2>
+  <p class="muted">Stored in Windows Credential Manager, never in files. Leave a box blank to keep the current value.</p>
+  <form method="post" action="/setup/secrets" class="grid">
+    <label>Anthropic API key {% if has_secret.anthropic_api_key %}<span class="ok">✓ saved</span>{% endif %}<input type="password" name="anthropic_api_key" autocomplete="off"></label>
+    <label>OpenAI API key {% if has_secret.openai_api_key %}<span class="ok">✓ saved</span>{% endif %}<input type="password" name="openai_api_key" autocomplete="off"></label>
+    <label>Shared ATS account password <span class="muted">(Workday/iCIMS/Taleo, coming later)</span> {% if has_secret.ats_password %}<span class="ok">✓ saved</span>{% endif %}<input type="password" name="ats_password" autocomplete="off"></label>
+    <button class="primary span">Save</button>
+  </form>
+</section>
+{% endblock %}

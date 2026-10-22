@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_macros.html" import job_row %}
+{% block content %}
+{% if setup_todo %}
+<section class="card warn">
+  <h2>Finish setup</h2>
+  <ul>{% for t in setup_todo %}<li>{{ t }}</li>{% endfor %}</ul>
+  <a href="/setup">Go to Setup →</a>
+</section>
+{% endif %}
+
+{% set sections = [
+  ("needs_input", "Waiting for your answers", "Answer the questions on each job (or on the Questions page) to move them to review."),
+  ("ready", "Ready for review", "Check the score, resume edits and answers, then approve or skip."),
+  ("approved", "Approved, waiting to submit", "These go out on the next run, within your daily caps."),
+  ("manual", "Needs you", "CAPTCHA, email verification or a field we couldn't fill. Open the job to finish it yourself."),
+  ("failed", "Failed", "Open the job to see what went wrong."),
+] %}
+{% for key, title, help in sections %}
+  {% set jobs = groups[key] %}
+  {% if jobs or key in ("ready", "needs_input") %}
+  <section>
+    <h2>{{ title }} <span class="muted">({{ jobs|length }})</span></h2>
+    <p class="muted">{{ help }}</p>
+    {% if jobs %}
+    <table class="jobs">
+      <thead><tr><th>Score</th><th>Role</th><th>Location</th><th>Notes</th><th></th></tr></thead>
+      <tbody>{% for job in jobs %}{{ job_row(job) }}{% endfor %}</tbody>
+    </table>
+    {% else %}<p class="empty">Nothing here.</p>{% endif %}
+  </section>
+  {% endif %}
+{% endfor %}
+{% endblock %}
