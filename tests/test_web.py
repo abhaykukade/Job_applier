@@ -77,3 +77,9 @@ def test_profile_form_roundtrip():
     p = store.load_profile()
     assert p.authorized_countries == ["United States", "Canada"]
     assert p.requires_sponsorship is False and p.years_experience == 8 and p.willing_to_relocate is None
+
+
+def test_flash_message_survives_fragment_redirect():
+    web = TestClient(app)
+    resp = web.post("/setup/resume-yaml", data={"content": "basics: {name: Jordan}"}, follow_redirects=False)
+    assert resp.headers["location"] == "/setup?msg=Resume%20saved#resume"

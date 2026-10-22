@@ -5,7 +5,8 @@ A local assistant that runs once a day on your Windows PC. It:
 1. **Finds jobs** on the Greenhouse, Lever and Ashby boards of companies you watch, and in LinkedIn
    search results (searched through LinkedIn's public job pages, never your account).
 2. **Filters** them by your titles, seniority, keywords, locations and remote/hybrid/onsite preference.
-3. **Scores** each match with an AI model (Claude, OpenAI or a local Ollama model).
+3. **Scores** each match with an AI model: Claude, OpenAI, or a **local model on your own PC**
+   (Ollama, LM Studio, llama.cpp, vLLM), so your data never leaves the machine.
 4. **Prepares** each application: reads the real form, fills what it can from your profile,
    suggests small, truthful resume edits, and writes a cover letter only when one is required.
 5. **Asks you** for anything it doesn't know and remembers the answer for next time.
@@ -70,6 +71,33 @@ Workday/iCIMS/Taleo applications come in a later milestone; see [PLAN.md](PLAN.m
    ```powershell
    jobapplier register-task --time 08:00
    ```
+
+## Using a local AI model (optional)
+
+Everything the AI does (resume import, scoring, tailoring, cover letters, answer drafts) can run
+on your PC instead of a cloud API. Nothing leaves your machine and there's no per-use cost, but it
+is slower and the resume edits are weaker than from a large cloud model.
+
+**Ollama** (easiest):
+
+1. Install it from ollama.com (Windows installer). It runs in the background.
+2. Pull a model, e.g. `ollama pull qwen2.5:14b`. As a rough guide, 7–8B models need about 8 GB of
+   RAM/VRAM, 14B about 12–16 GB, and 32B about 24 GB+. Bigger models tailor resumes better.
+3. In **Setup → Search & limits → AI model**, pick *Ollama (local)*. The installed models appear
+   in the Model box. Click **Test AI model** to check it works.
+
+**LM Studio, llama.cpp `llama-server`, vLLM, Jan, LocalAI**: start the server, load a model, then
+pick *Local server* and set **Base URL** if it's not LM Studio's default `http://localhost:1234/v1`
+(llama-server: `http://localhost:8080/v1`).
+
+Tips:
+
+- **Context size** (default 16k tokens) must fit your resume plus a job description. If a prompt
+  doesn't fit, the run says so instead of quietly dropping part of your resume. More context uses
+  more memory.
+- Lower *Max jobs scored per run* if daily runs take too long: each job takes 2–3 model calls.
+- Replies that aren't valid JSON are retried once, and `<think>` blocks from reasoning models are
+  ignored.
 
 ## Daily routine
 

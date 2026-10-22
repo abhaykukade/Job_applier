@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import time
 import threading
 from pathlib import Path
 from typing import get_args
@@ -14,7 +15,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import func, select
 
@@ -32,7 +33,7 @@ from job_applier.db import (
     Suggestion,
 )
 from job_applier.forms.models import FormField
-from job_applier.llm import LLMError, get_llm
+from job_applier.llm import LOCAL_PROVIDERS, PROVIDERS, LLMError, get_llm, list_local_models
 from job_applier.pipeline import ai, review
 from job_applier.pipeline.answers import answer_question, open_questions
 from job_applier.pipeline.run import Busy, run_daily, run_submit
@@ -49,7 +50,9 @@ templates = Jinja2Templates(directory=HERE / "templates")
 
 def go(url: str, msg: str | None = None, error: bool = False) -> RedirectResponse:
     if msg:
-        url += ("&" if "?" in url else "?") + ("err=" if error else "msg=") + quote(msg)
+        path, hash_, fragment = url.partition("#")
+        path += ("&" if "?" in path else "?") + ("err=" if error else "msg=") + quote(msg)
+        url = path + hash_ + fragment  # the query must come before any #fragment
     return RedirectResponse(url, status_code=303)
 
 
@@ -148,8 +151,11 @@ def queue(request: Request):
         setup_todo.append("Complete your profile: " + ", ".join(missing))
     if not companies:
         setup_todo.append("Add companies to watch")
-    if load_settings().llm.provider in ("anthropic", "openai") and not secrets.has_secret(f"{load_settings().llm.provider}_api_key"):
+    llm_cfg = load_settings().llm
+    if llm_cfg.provider in ("anthropic", "openai") and not secrets.has_secret(f"{llm_cfg.provider}_api_key"):
         setup_todo.append("Add your LLM API key")
+    if llm_cfg.provider in LOCAL_PROVIDERS and not llm_cfg.model:
+        setup_todo.append("Choose a local AI model (Setup → AI model)")
     return render(request, "queue.html", groups=groups, setup_todo=setup_todo)
 
 
@@ -394,6 +400,9 @@ def setup(request: Request):
         workplaces=get_args(Workplace),
         missing=profile.missing_essentials(),
         linkedin=li_session.status(),
+        providers=PROVIDERS,
+        is_local=load_settings().llm.provider in LOCAL_PROVIDERS,
+        local_models=list_local_models(load_settings().llm),
         experience_levels=EXPERIENCE_LEVELS,
     )
 
@@ -444,6 +453,25 @@ def save_resume_yaml(content: str = Form(...)):
         return go("/setup#resume", f"Resume not saved: {exc}", True)
     store.save_resume(resume)
     return go("/setup#resume", "Resume saved")
+
+
+class _Ping(BaseModel):
+    ok: bool
+    greeting: str
+
+
+@app.post("/setup/test-llm")
+def test_llm():
+    cfg = load_settings().llm
+    started = time.monotonic()
+    try:
+        reply = get_llm(cfg).structured(
+            "You are a connectivity check.", 'Set ok to true and greeting to "hello".', _Ping
+        )
+    except LLMError as exc:
+        return go("/setup#ai", f"AI model test failed: {exc}", True)
+    took = time.monotonic() - started
+    return go("/setup#ai", f"{PROVIDERS[cfg.provider]} · {cfg.model} replied in {took:.1f}s (ok={reply.ok})")
 
 
 @app.post("/setup/suggest-search")
@@ -518,12 +546,21 @@ async def save_settings_form(request: Request):
     data["min_score"] = int(form.get("min_score") or 60)
     data["max_scored_per_run"] = int(form.get("max_scored_per_run") or 40)
     data["caps"] = {ats: int(form.get(f"cap_{ats}") or 0) for ats in data["caps"]}
+    provider = form.get("llm_provider") or "anthropic"
+    model = str(form.get("llm_model") or "").strip()
+    if provider == "anthropic" and not model:
+        model = "claude-opus-5-5"
     data["llm"].update(
-        provider=form.get("llm_provider") or "anthropic",
-        model=str(form.get("llm_model") or "").strip() or "claude-opus-5-5",
+        provider=provider,
+        model=model,
         effort=form.get("llm_effort") or "medium",
         base_url=str(form.get("llm_base_url") or "").strip() or None,
+        context_tokens=int(form.get("llm_context_tokens") or 16384),
     )
+    if provider in LOCAL_PROVIDERS and (not model or model.startswith("claude-")):
+        # Switched to a local provider: pick an installed model if there's one.
+        installed = list_local_models(Settings.model_validate(data).llm)
+        data["llm"]["model"] = installed[0] if installed else ""
     data["submit"].update(
         dry_run=form.get("dry_run") == "on",
         headless=form.get("headless") == "on",

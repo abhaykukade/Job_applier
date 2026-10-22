@@ -13,10 +13,14 @@ Workplace = Literal["remote", "hybrid", "onsite"]
 
 
 class LLMSettings(BaseModel):
-    provider: Literal["anthropic", "openai", "ollama"] = "anthropic"
+    # "ollama" and "local" (LM Studio, llama.cpp, vLLM…) run on your PC; nothing is sent out.
+    provider: Literal["anthropic", "openai", "ollama", "local"] = "anthropic"
     model: str = "claude-opus-5-5"
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
-    base_url: str | None = None  # Ollama server or OpenAI-compatible endpoint
+    effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"  # Claude only
+    base_url: str | None = None  # blank = the provider's usual local address
+    # Local models: context window to request. Resume + job description need ~6-12k tokens.
+    context_tokens: int = 16384
+    timeout_s: int = 900  # local models on a CPU can be slow
 
 
 class SearchSettings(BaseModel):

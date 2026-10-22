@@ -12,7 +12,7 @@ company ATS sites.
 | LinkedIn | **Assisted Easy Apply**: drives a real, logged-in browser profile on your PC, keeps to daily caps and paces itself like a person, and submits only after you approve |
 | Autonomy | **Daily review queue**: discover → score → tailor → pre-fill, then you approve in one batch, then it submits |
 | Runtime | **Your own Windows PC**, run daily by Windows Task Scheduler |
-| LLM | **Pluggable**: Anthropic (Claude), OpenAI or Ollama, picked in config |
+| LLM | **Pluggable**: Anthropic (Claude), OpenAI, or local: Ollama / any OpenAI-compatible local server (LM Studio, llama.cpp, vLLM), picked in Setup |
 | Sources | LinkedIn, **Greenhouse / Lever / Ashby**, **Workday / iCIMS / Taleo** |
 | UI | **Local web dashboard** at `http://localhost:8765` |
 | Resume | **Structured master resume (YAML)**: imported once from your DOCX/PDF, then rendered to PDF and DOCX from a clean ATS-friendly template (reason below) |

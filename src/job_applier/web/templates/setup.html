@@ -46,7 +46,10 @@
 
 <section class="card" id="search">
   <h2>3. Search & limits</h2>
-  <form method="post" action="/setup/suggest-search" class="inline-form"><button class="small">Suggest titles & keywords from my resume</button></form>
+  <div class="inline-form">
+    <form method="post" action="/setup/suggest-search"><button class="small">Suggest titles & keywords from my resume</button></form>
+    <form method="post" action="/setup/test-llm"><button class="small">Test AI model</button></form>
+  </div>
   <form method="post" action="/setup/settings" class="grid">
     {% set sch = settings.search %}
     <label>Target titles <span class="muted">(one per line; the title must contain one)</span><textarea name="titles_include" rows="5">{{ sch.titles_include | join("\n") }}</textarea></label>
@@ -67,11 +70,18 @@
       <label class="check"><input type="checkbox" name="headless" {% if settings.submit.headless %}checked{% endif %}> Hidden browser <span class="muted">(you can't solve CAPTCHAs then)</span></label>
       <label class="inline">Delay between applications (s) <input type="number" name="min_delay_s" value="{{ settings.submit.min_delay_s }}" class="narrow"> to <input type="number" name="max_delay_s" value="{{ settings.submit.max_delay_s }}" class="narrow"></label>
     </fieldset>
-    <fieldset class="span"><legend>AI model</legend>
-      <label class="inline">Provider <select name="llm_provider">{% for p in ("anthropic", "openai", "ollama") %}<option {% if settings.llm.provider == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
-      <label class="inline">Model <input name="llm_model" value="{{ settings.llm.model }}"></label>
-      <label class="inline">Effort <select name="llm_effort">{% for e in ("low", "medium", "high", "xhigh", "max") %}<option {% if settings.llm.effort == e %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></label>
-      <label class="inline">Base URL <input name="llm_base_url" value="{{ settings.llm.base_url or '' }}" placeholder="Ollama: http://localhost:11434"></label>
+    <fieldset class="span" id="ai"><legend>AI model</legend>
+      <label class="inline">Provider <select name="llm_provider">{% for p, name in providers.items() %}<option value="{{ p }}" {% if settings.llm.provider == p %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+      <label class="inline">Model <input name="llm_model" value="{{ settings.llm.model }}" list="local-models" placeholder="{{ 'e.g. qwen2.5:14b' if is_local else '' }}"></label>
+      <datalist id="local-models">{% for m in local_models %}<option value="{{ m }}">{% endfor %}</datalist>
+      <label class="inline">Effort <span class="muted">(Claude)</span> <select name="llm_effort">{% for e in ("low", "medium", "high", "xhigh", "max") %}<option {% if settings.llm.effort == e %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></label>
+      <label class="inline">Base URL <input name="llm_base_url" value="{{ settings.llm.base_url or '' }}" placeholder="blank = Ollama :11434 / LM Studio :1234/v1"></label>
+      <label class="inline">Context size <span class="muted">(local, tokens)</span> <input type="number" name="llm_context_tokens" value="{{ settings.llm.context_tokens }}" class="narrow"></label>
+      {% if is_local %}
+      <p class="muted">Runs on this PC: your resume and answers never leave it.
+        {% if local_models %}Installed: {{ local_models | join(", ") }}.{% else %}<span class="bad">No models found at the local server; is it running?</span>{% endif %}
+        Smaller models are faster but write weaker resume edits; 14B+ is a good balance if your PC has the memory.</p>
+      {% endif %}
     </fieldset>
     <label>Daily run time <span class="muted">(used by <code>jobapplier register-task</code>)</span><input name="schedule_time" value="{{ settings.schedule_time }}"></label>
     <label>Chromium path <span class="muted">(blank = Playwright's)</span><input name="browser_executable" value="{{ settings.browser_executable or '' }}"></label>
